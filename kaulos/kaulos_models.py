@@ -52,6 +52,10 @@ class HodgkinHuxley(Layer):
         self.dt = dt
         self.threshold = threshold
         self.alpha = alpha
+        self.g_K = 36.0
+        self.g_Na = 120.0
+        self.g_R = 0.3
+        self.E = [-12.0, 115.0, 10.613]
         super(HodgkinHuxley, self).__init__(**kwargs)
     def build(self, input_shape):
         self.input_shape_m = input_shape
@@ -76,23 +80,19 @@ class HodgkinHuxley(Layer):
             name='h',
             initializer='ones',
             trainable=False)
-        self.g_K = 36
-        self.g_Na = 120
-        self.g_R = 0.3
-        self.E = [-12, 115, 10.613]
         super(HodgkinHuxley, self).build(input_shape)
     def call(self, I_ext):
-        a_1 = (10-self.V)/(100*(K.exp((10-self.V)/10)-1))
-        a_2 = (25-self.V)/(10*(K.exp((25-self.V)/10)-1))
-        a_3 = 0.07*K.exp(-self.V/20)
+        a_1 = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
+        a_2 = (25.0-self.V)/(10.0*(K.exp((25.0-self.V)/10.0)-1.0))
+        a_3 = 0.07*K.exp(-self.V/20.0)
 
-        b_1 = 0.125*K.exp(-self.V/80)
-        b_2 = 4*K.exp(-self.V/18)
-        b_3 = 1/(K.exp((30-self.V/10)+1))
+        b_1 = 0.125*K.exp(-1 * self.V/80.0)
+        b_2 = 4.0*K.exp(-1 * self.V/18.0)
+        b_3 = 1.0/(K.exp((30.0-self.V)/10.0)+1.0)
 
-        m = self.m + self.dt*(a_1*(1-self.m) - b_1*self.m)
-        n = self.n + self.dt*(a_2*(1-self.n) - b_2*self.n)
-        h = self.h + self.dt*(a_3*(1-self.h) - b_3*self.h)
+        m = self.m + self.dt*(a_1*(1.0-self.m) - b_1*self.m)
+        n = self.n + self.dt*(a_2*(1.0-self.n) - b_2*self.n)
+        h = self.h + self.dt*(a_3*(1.0-self.h) - b_3*self.h)
 
         gnmh_1 = self.g_K*K.pow(m, 4)
         gnmh_2 = self.g_Na*K.pow(n, 3)*h
@@ -105,10 +105,46 @@ class HodgkinHuxley(Layer):
         updates.append((self.h, h))
         updates.append((self.V, V))
         self.add_update(updates)
-        return self.V
+        return V
     def compute_output_shape(self, input_shape):
         return input_shape
 
+class AlphaSynapse(Layer):
+    def __init__(self, dt, ar, ad, **kwargs):
+        self.dt = dt
+        self.ar = ar
+        self.ad = ad
+        self.V_reverse = 100
+        super(AlphaSynapse, self).__init__(**kwargs)
+    def build(self, input_shape):
+        self.input_shape_m = input_shape
+        print(input_shape[1:])
+        self.a = self.add_weight(
+            shape=(3,1),
+            name='a',
+            initializer='zeros',
+            trainable=False)
+        self.g = self.add_weight(
+            shape=(1,1),
+            name='g',
+            initializer='zeros',
+            trainable=False)
+        self.I = self.add_weight(
+            shape=(1,1),
+            name='I',
+            initializer='zeros',
+            trainable=False)
+        super(AlphaSynapse, self).build(input_shape)
+    def call(self, s_ext):
+
+        updates = []
+        updates.append((self.a, a))
+        updates.append((self.g, g))
+        updates.append((self.I, h))
+        self.add_update(updates)
+        return self.V
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
 
 class _Relay():
@@ -119,3 +155,4 @@ class _Relay():
 		self.states = {}
 
 		options.update(kwargs)
+    #def param_update(self, U):
