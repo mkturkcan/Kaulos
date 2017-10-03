@@ -31,6 +31,7 @@ from scipy.stats import zscore
 from keras.layers import Input
 from keras.datasets import mnist
 from keras.utils import np_utils
+from keras.initializers import Constant
 from keras.models import Sequential, Model
 from keras.layers.noise import GaussianNoise
 from keras.optimizers import SGD, RMSprop, Adam
