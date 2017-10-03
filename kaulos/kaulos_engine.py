@@ -5,6 +5,11 @@ class _KaulosModel(Layer):
         self.lpu_attributes = LPU_Attr()
         super(_KaulosModel, self).__init__(**kwargs)
         self.update_lpu_attrs(**kwargs)
+    def __getattr__(self, key):
+        if key in self.params:
+            return self.params[key]
+        else:
+            return super(_KaulosModel, self).__getattr__(key)
     def build(self, input_shape):
         super(_KaulosModel, self).build(input_shape)
         self.update_lpu_attrs

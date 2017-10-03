@@ -36,11 +36,14 @@ class HodgkinHuxley(_KaulosModel):
         self.dt = dt
         self.threshold = threshold
         self.alpha = alpha
-        params = {'g_K': 36.0}
-        self.g_K = 36.0
-        self.g_Na = 120.0
-        self.g_R = 0.3
-        self.E = [-12.0, 115.0, 10.613]
+        self.params = {
+            'g_K': 36.0,
+            'g_Na': 120.0,
+            'g_l': 0.3,
+            'E_K': -77.,
+            'E_Na': 50.,
+            'E_l': -54.4
+        }
         super(HodgkinHuxley, self).__init__(**kwargs)
     def build(self, input_shape):
         self.input_shape_m = input_shape
@@ -67,22 +70,22 @@ class HodgkinHuxley(_KaulosModel):
             trainable=False)
         super(HodgkinHuxley, self).build(input_shape)
     def call(self, I_ext):
-        a_1 = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
-        a_2 = (25.0-self.V)/(10.0*(K.exp((25.0-self.V)/10.0)-1.0))
-        a_3 = 0.07*K.exp(-self.V/20.0)
+        a_n = (25.0-self.V)/(10.0*(K.exp((25.0-self.V)/10.0)-1.0))
+        a_m = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
+        a_h = 0.07*K.exp(-self.V/20.0)
 
-        b_1 = 0.125*K.exp(-1 * self.V/80.0)
-        b_2 = 4.0*K.exp(-1 * self.V/18.0)
-        b_3 = 1.0/(K.exp((30.0-self.V)/10.0)+1.0)
+        b_n = 4.0*K.exp(-1 * self.V/18.0)
+        b_m = 0.125*K.exp(-1 * self.V/80.0)
+        b_h = 1.0/(K.exp((30.0-self.V)/10.0)+1.0)
 
-        m = self.m + self.dt*(a_1*(1.0-self.m) - b_1*self.m)
-        n = self.n + self.dt*(a_2*(1.0-self.n) - b_2*self.n)
-        h = self.h + self.dt*(a_3*(1.0-self.h) - b_3*self.h)
+        n = self.n + self.dt*(a_n*(1.0-self.n) - b_n*self.n)
+        m = self.m + self.dt*(a_m*(1.0-self.m) - b_m*self.m)
+        h = self.h + self.dt*(a_h*(1.0-self.h) - b_h*self.h)
 
-        gnmh_1 = self.g_K*K.pow(m, 4)
-        gnmh_2 = self.g_Na*K.pow(n, 3)*h
-        gnmh_3 = self.g_R
-        I = (gnmh_1 *(self.V-self.E[0])) + (gnmh_2 *(self.V-self.E[1])) + (gnmh_3 *(self.V-self.E[2]))
+        I_K = self.g_K*K.pow(m, 4)*(self.V-self.E_K)
+        I_Na = self.g_Na*K.pow(n, 3)*h*(self.V-self.E_Na)
+        I_l = self.g_l*(self.V-self.E_l)
+        I = I_K + I_Na + I_l
         V = self.V + self.dt*(I_ext - I)
         updates = []
         updates.append((self.m, m))
