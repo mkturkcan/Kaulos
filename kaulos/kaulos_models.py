@@ -114,14 +114,25 @@ class AlphaSynapse(Layer):
         self.dt = dt
         self.ar = ar
         self.ad = ad
+        self.gmax = 10
         self.V_reverse = 100
         super(AlphaSynapse, self).__init__(**kwargs)
     def build(self, input_shape):
         self.input_shape_m = input_shape
         print(input_shape[1:])
-        self.a = self.add_weight(
-            shape=(3,1),
-            name='a',
+        self.a_0 = self.add_weight(
+            shape=(1,1),
+            name='a_0',
+            initializer='zeros',
+            trainable=False)
+        self.a_1 = self.add_weight(
+            shape=(1,1),
+            name='a_1',
+            initializer='zeros',
+            trainable=False)
+        self.a_2 = self.add_weight(
+            shape=(1,1),
+            name='a_2',
             initializer='zeros',
             trainable=False)
         self.g = self.add_weight(
@@ -129,23 +140,23 @@ class AlphaSynapse(Layer):
             name='g',
             initializer='zeros',
             trainable=False)
-        self.I = self.add_weight(
-            shape=(1,1),
-            name='I',
-            initializer='zeros',
-            trainable=False)
         super(AlphaSynapse, self).build(input_shape)
     def call(self, s_ext):
+        new_a_0 = K.maximum( 0. , self.a_0 + self.dt*self.a_1 )
+        new_a_1 = self.a_1 + self.dt*self.a_2
+        new_a_1 = new_a_1 + self.ar*self.ad*s_ext
+        new_a_2 = -( self.ar+self.ad )*self.a_1 - self.ar*self.ad*self.a_0
 
+        g = new_a_0*self.gmax
         updates = []
-        updates.append((self.a, a))
+        updates.append((self.a_0, new_a_0))
+        updates.append((self.a_1, new_a_1))
+        updates.append((self.a_2, new_a_2))
         updates.append((self.g, g))
-        updates.append((self.I, h))
         self.add_update(updates)
-        return self.V
+        return self.g
     def compute_output_shape(self, input_shape):
         return input_shape
-
 
 class _Relay():
     def __init__(self, **kwargs):
