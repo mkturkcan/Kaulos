@@ -4,7 +4,7 @@ from keras.layers.recurrent import *
 
 _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
-    def __init__(self, threshold, alpha, **kwargs):
+    def __init__(self, dt, threshold, alpha, **kwargs):
         self.threshold = threshold
         self.alpha = alpha
         super(LeakyIAF, self).__init__(**kwargs)
@@ -32,7 +32,7 @@ class LeakyIAF(_KaulosModel):
         return input_shape
 
 
-class HodgkinHuxley(Layer):
+class HodgkinHuxley(_KaulosModel):
     def __init__(self, dt, threshold, alpha, **kwargs):
         self.dt = dt
         self.threshold = threshold
@@ -94,7 +94,7 @@ class HodgkinHuxley(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape
 
-class AlphaSynapse(Layer):
+class AlphaSynapse(_KaulosModel):
     def __init__(self, dt, ar, ad, **kwargs):
         self.dt = dt
         self.ar = ar
