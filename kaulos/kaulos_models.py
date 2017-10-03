@@ -1,24 +1,9 @@
-from compact_dependencies import *
+from kaulos_engine import _KaulosModel
 from keras.layers.recurrent import *
-import sys
-sys.setrecursionlimit(10000)
-from keras.layers import Lambda
-import keras
-from keras.datasets import mnist
-from keras.models import Sequential
-from keras.layers import Dense, Activation, Conv1D, Flatten, Lambda, Concatenate, Input, Reshape, BatchNormalization
-from keras.layers import SimpleRNN, GRU, LSTM
-from keras import initializers
-from keras.optimizers import RMSprop, Adam
-from keras.initializers import Constant
-from keras.models import Model
-import theano.tensor as T
-from keras import backend as K
-from keras.engine.topology import Layer
-import numpy as np
+
 
 _BACKEND = 'theano'
-class LeakyIAF(Layer):
+class LeakyIAF(_KaulosModel):
     def __init__(self, threshold, alpha, **kwargs):
         self.threshold = threshold
         self.alpha = alpha
@@ -157,13 +142,3 @@ class AlphaSynapse(Layer):
         return self.g
     def compute_output_shape(self, input_shape):
         return input_shape
-
-class _Relay():
-    def __init__(self, **kwargs):
-		self.params = {}
-		self.updates = {}
-		self.accesses = []
-		self.states = {}
-
-		options.update(kwargs)
-    #def param_update(self, U):

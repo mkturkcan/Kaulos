@@ -1,4 +1,22 @@
 from __future__ import division, print_function
+
+import sys
+sys.setrecursionlimit(10000)
+from keras.layers import Lambda
+import keras
+from keras.datasets import mnist
+from keras.models import Sequential
+from keras.layers import Dense, Activation, Conv1D, Flatten, Lambda, Concatenate, Input, Reshape, BatchNormalization
+from keras.layers import SimpleRNN, GRU, LSTM
+from keras import initializers
+from keras.optimizers import RMSprop, Adam
+from keras.initializers import Constant
+from keras.models import Model
+import theano.tensor as T
+from keras import backend as K
+from keras.engine.topology import Layer
+import numpy as np
+
 import gc
 import json
 import h5py
