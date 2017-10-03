@@ -3,17 +3,11 @@ from kaulos_engine import _KaulosModel
 
 _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
+    params = {'threshold': 1.0, 'R': 1.0, 'C': 1.0}
+    alters = {'V': 0.0, 's': 0.0}
+    states = {}
+    accesses = ['I']
     def __init__(self, **kwargs):
-        self.params = {'threshold': 1.0,
-                       'R': 1.0,
-                       'C': 1.0,
-                      }
-        self.alters = {'V': 0.0,
-                       's': 0.0
-                      }
-        self.states = {
-                      }
-        self.accesses = ['I']
         super(LeakyIAF, self).__init__(**kwargs)
     def build(self, input_shape):
         super(LeakyIAF, self).build(input_shape)
@@ -33,23 +27,12 @@ class LeakyIAF(_KaulosModel):
 
 
 class HodgkinHuxley(_KaulosModel):
+    params = {'g_K': 36.0,'g_Na': 120.0,'g_l': 0.3,'E_K': -12.,
+              'E_Na': 115.,'E_l': 10.613}
+    alters = {'V': 0.0,'s': 0.0}
+    states = {'n': 0.0,'m': 0.0,'h': 1.0}
+    accesses = ['I']
     def __init__(self, **kwargs):
-        self.params = {
-            'g_K': 36.0,
-            'g_Na': 120.0,
-            'g_l': 0.3,
-            'E_K': -12.,
-            'E_Na': 115.,
-            'E_l': 10.613
-        }
-        self.alters = {'V': 0.0,
-                       's': 0.0
-                      }
-        self.states = {'n': 0.0,
-                        'm': 0.0,
-                        'h': 1.0,
-                      }
-        self.accesses = ['I']
         super(HodgkinHuxley, self).__init__(**kwargs)
     def build(self, input_shape):
         super(HodgkinHuxley, self).build(input_shape)
@@ -82,19 +65,11 @@ class HodgkinHuxley(_KaulosModel):
         return input_shape
 
 class AlphaSynapse(_KaulosModel):
+    params = {'ar': 1.0, 'ad': 1.0, 'gmax': 100.}
+    alters = {'g': 0.0}
+    states = {'a_0': 0.0,'a_1': 0.0,'a_2': 1.0}
+    accesses = ['s']
     def __init__(self,**kwargs):
-        self.params = {
-            'ar': 1.0,
-            'ad': 1.0,
-            'gmax': 100.,
-        }
-        self.alters = {'g': 0.0,
-                      }
-        self.states = {'a_0': 0.0,
-                       'a_1': 0.0,
-                       'a_2': 1.0,
-                      }
-        self.accesses = ['s']
         super(AlphaSynapse, self).__init__(**kwargs)
     def build(self, input_shape):
         super(AlphaSynapse, self).build(input_shape)
