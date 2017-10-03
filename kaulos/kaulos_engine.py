@@ -7,6 +7,7 @@ class _KaulosModel(Layer):
         self.update_lpu_attrs(**kwargs)
     def build(self, input_shape):
         super(_KaulosModel, self).build(input_shape)
+        self.update_lpu_attrs
     def update_lpu_attrs(self, **kwargs):
         for a,b in kwargs.iteritems():
             if a in self.lpu_attributes.params.keys():

@@ -16,6 +16,7 @@ import theano.tensor as T
 from keras import backend as K
 from keras.engine.topology import Layer
 import numpy as np
+from keras.layers.recurrent import *
 
 import gc
 import json

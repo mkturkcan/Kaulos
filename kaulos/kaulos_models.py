@@ -1,6 +1,5 @@
+from compact_dependencies import *
 from kaulos_engine import _KaulosModel
-from keras.layers.recurrent import *
-
 
 _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
@@ -37,6 +36,7 @@ class HodgkinHuxley(_KaulosModel):
         self.dt = dt
         self.threshold = threshold
         self.alpha = alpha
+        params = {'g_K': 36.0}
         self.g_K = 36.0
         self.g_Na = 120.0
         self.g_R = 0.3
