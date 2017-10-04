@@ -5,24 +5,22 @@ _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('s', 0.0)])
-    states = OrderedDict([])
+    inters = OrderedDict([])
     accesses = ['I']
     def __init__(self, **kwargs):
         super(LeakyIAF, self).__init__(**kwargs)
     def build(self, input_shape):
-        print(input_shape)
         super(LeakyIAF, self).build(input_shape)
-    def call(self, I):
+    def call(self, I, S):
+        V_old = S[0]
         V = self.V + I * self.C
         if (_BACKEND == 'tensorflow'):
             import tensorflow as tf
             V = tf.where(K.greater(V, self.threshold), 0. * V, V)
         else:
             V = K.switch(K.greater(V, self.threshold), 0. * V, V)
-        updates = []
-        updates.append((self.V, V))
-        self.add_update(updates)
-        return self.call_outs
+
+        return V, [V]
 
 
 
