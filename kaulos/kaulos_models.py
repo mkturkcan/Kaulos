@@ -8,10 +8,6 @@ class LeakyIAF(_KaulosModel):
     alters = OrderedDict([('V', 0.0), ('s', 0.0)])
     inters = OrderedDict([])
     accesses = ['I']
-    def __init__(self, **kwargs):
-        super(LeakyIAF, self).__init__(**kwargs)
-    def build(self, input_shape):
-        super(LeakyIAF, self).build(input_shape)
     def kaulos_step(self):
         V = self.V + self.I
         if (_BACKEND == 'tensorflow'):
@@ -19,26 +15,18 @@ class LeakyIAF(_KaulosModel):
             V = tf.where(K.greater(V, self.threshold), 0. * V, V)
         else:
             s = K.round(V / (2.0 * self.threshold))
-            #s = K.switch(K.greater(V, self.threshold), self.s + 1., 0. * self.s)
             V = V - self.threshold * K.round(V / (2.0 * self.threshold))
-            #V = K.switch(K.greater(V, self.threshold), 0. * V, V)
         self.V = V
         self.s = s
         print("V: " + str(self.V))
-
-
 
 class HodgkinHuxley(_KaulosModel):
     params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
               ('E_Na', 115.), ('E_l', 10.613)])
     alters = OrderedDict([('V', 0.0),('s', 0.0)])
-    states = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0)])
+    inters = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0)])
     accesses = ['I']
-    def __init__(self, **kwargs):
-        super(HodgkinHuxley, self).__init__(**kwargs)
-    def build(self, input_shape):
-        super(HodgkinHuxley, self).build(input_shape)
-    def call(self, I_ext):
+    def kaulos_step(self):
         a_n = (25.0-self.V)/(10.0*(K.exp((25.0-self.V)/10.0)-1.0))
         a_m = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
         a_h = 0.07*K.exp(-self.V/20.0)
@@ -55,19 +43,17 @@ class HodgkinHuxley(_KaulosModel):
         I_Na = self.g_Na*K.pow(n, 3)*h*(self.V-self.E_Na)
         I_l = self.g_l*(self.V-self.E_l)
         I = I_K + I_Na + I_l
-        V = self.V + self.dt*(I_ext - I)
-        updates = []
-        updates.append((self.m, m))
-        updates.append((self.n, n))
-        updates.append((self.h, h))
-        updates.append((self.V, V))
-        self.add_update(updates)
-        return self.call_outs
+        self.V = self.V + self.dt*(self.I - I)
+        self.s = self.V
+        self.m = m
+        self.n = n
+        self.h = h
+        self.m = m
 
 class AlphaSynapse(_KaulosModel):
     params = OrderedDict([('ar', 1.0),('ad', 1.0), ('gmax', 100.)])
     alters = OrderedDict([('g', 0.0)])
-    states = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 1.0)])
+    inters = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 1.0)])
     accesses = ['s']
     def __init__(self,**kwargs):
         super(AlphaSynapse, self).__init__(**kwargs)
