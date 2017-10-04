@@ -81,14 +81,17 @@ class _KaulosModel(Layer):
         i = 0
         for a in self.lpu_attributes.alters:
             print(a, i, self.lpu_attributes.alters[a])
-            self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
-            i+=1
+            if len(self.lpu_attributes.alters)>1:
+                self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
+            else:
+                self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
+            i += 1
         if len(self.inters)>0:
             i = 0
             for a in self.lpu_attributes.inters:
                 print(a, i)
                 self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-                i+=1
+                i += 1
     def call(self, I, S):
         self.acquire(I, S)
         self.kaulos_step()
@@ -152,10 +155,16 @@ class KaulosWrapperCell(keras.layers.Layer):
             unit_range = range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1])))
             state_range = range(int(sum(self.state_ind_len[:ii])),int(sum(self.state_ind_len[:ii+1])))
             call_states = []
-            call_states.append(states[0][:,unit_range])
-            if len(self.state_sizes[ii])>1:
-                call_states.append(states[1][:,state_range])
-            a, b = i.call(inputs[:,unit_range],call_states)
+            if len(unit_range)>1:
+                call_states.append(states[0][:,unit_range])
+                if len(self.state_sizes[ii])>1:
+                    call_states.append(states[1][:,state_range])
+                a, b = i.call(inputs[:,unit_range],call_states)
+            else:
+                call_states.append(states[0][:,unit_range[0]:unit_range[0]+1])
+                if len(self.state_sizes[ii])>1:
+                    call_states.append(states[1][:,state_range[0]:state_range[0]+1])
+                a, b = i.call(inputs[:,unit_range[0]:unit_range[0]+1],call_states)
             out_states.append(b)
             outs += [a]
             ii += 1

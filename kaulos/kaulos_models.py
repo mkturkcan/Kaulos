@@ -51,25 +51,17 @@ class HodgkinHuxley(_KaulosModel):
         self.m = m
 
 class AlphaSynapse(_KaulosModel):
-    params = OrderedDict([('ar', 1.0),('ad', 1.0), ('gmax', 100.)])
-    alters = OrderedDict([('g', 0.0)])
-    inters = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 1.0)])
-    accesses = ['s']
-    def __init__(self,**kwargs):
-        super(AlphaSynapse, self).__init__(**kwargs)
-    def build(self, input_shape):
-        print(input_shape)
-        super(AlphaSynapse, self).build(input_shape)
-    def call(self, s_ext):
-        new_a_0 = K.maximum( 0. , self.a_0 + self.dt*self.a_1 )
-        new_a_1 = self.a_1 + self.dt*self.a_2
-        new_a_1 = new_a_1 + self.ar*self.ad*s_ext
-        new_a_2 = -( self.ar + self.ad )*self.a_1 - self.ar * self.ad * self.a_0
-        g = new_a_0*self.gmax
-        updates = []
-        updates.append((self.a_0, new_a_0))
-        updates.append((self.a_1, new_a_1))
-        updates.append((self.a_2, new_a_2))
-        updates.append((self.g, g))
-        self.add_update(updates)
-        return self.call_outs
+    params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.)])
+    alters = OrderedDict([('g', 0.0), ('gm', 0.0)])
+    inters = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 0.0)])
+    accesses = ['spike_state']
+    def kaulos_step(self):
+        new_a_0 = K.maximum(0., self.a_0 + self.dt*self.a_1)
+        new_a_1 = self.a_1 + self.dt*self.a_2 + self.ar*self.ad*self.spike_state
+        new_a_2 = -(self.ar + self.ad)*self.a_1 - self.ar * self.ad * self.a_0
+        g = K.minimum(self.gmax, self.gmax * new_a_0)
+        self.a_0 = new_a_0
+        self.a_1 = new_a_1
+        self.a_2 = new_a_2
+        self.g = g
+        self.gm = g
