@@ -21,7 +21,6 @@ class _KaulosModel(Layer):
         else:
             return super(_KaulosModel, self).__getattr__(key)
     def build(self, input_shape):
-
         for a in self.lpu_attributes.alters:
             self.lpu_attributes.alters[a] = self.add_weight(
                 shape=(1,1),

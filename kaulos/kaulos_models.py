@@ -10,6 +10,7 @@ class LeakyIAF(_KaulosModel):
     def __init__(self, **kwargs):
         super(LeakyIAF, self).__init__(**kwargs)
     def build(self, input_shape):
+        print(input_shape)
         super(LeakyIAF, self).build(input_shape)
     def call(self, I):
         V = self.V + I * self.C
@@ -69,6 +70,7 @@ class AlphaSynapse(_KaulosModel):
     def __init__(self,**kwargs):
         super(AlphaSynapse, self).__init__(**kwargs)
     def build(self, input_shape):
+        print(input_shape)
         super(AlphaSynapse, self).build(input_shape)
     def call(self, s_ext):
         new_a_0 = K.maximum( 0. , self.a_0 + self.dt*self.a_1 )
