@@ -5,7 +5,7 @@ from kaulos_engine import _KaulosModel
 _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
-    alters = OrderedDict([('V', 0.0), ('s', 0.0)])
+    alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
     inters = OrderedDict([])
     accesses = ['I']
     def kaulos_step(self):
@@ -14,16 +14,16 @@ class LeakyIAF(_KaulosModel):
             import tensorflow as tf
             V = tf.where(K.greater(V, self.threshold), 0. * V, V)
         else:
-            s = K.round(V / (2.0 * self.threshold))
+            spike = K.round(V / (2.0 * self.threshold))
             V = V - self.threshold * K.round(V / (2.0 * self.threshold))
         self.V = V
-        self.s = s
+        self.spike = spike
         print("V: " + str(self.V))
 
 class HodgkinHuxley(_KaulosModel):
     params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
               ('E_Na', 115.), ('E_l', 10.613)])
-    alters = OrderedDict([('V', 0.0),('s', 0.0)])
+    alters = OrderedDict([('V', 0.0),('spike', 0.0)])
     inters = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0)])
     accesses = ['I']
     def kaulos_step(self):
@@ -51,13 +51,13 @@ class HodgkinHuxley(_KaulosModel):
         self.m = m
 
 class AlphaSynapse(_KaulosModel):
-    params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.)])
-    alters = OrderedDict([('g', 0.0), ('gm', 0.0)])
+    params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.), ('V_reverse_default', 100.)])
+    alters = OrderedDict([('g', 0.0), ('V_reverse', 100.)])
     inters = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 0.0)])
-    accesses = ['spike_state']
+    accesses = ['spike']
     def kaulos_step(self):
         new_a_0 = K.maximum(0., self.a_0 + self.dt*self.a_1)
-        new_a_1 = self.a_1 + self.dt*self.a_2 + self.ar*self.ad*self.spike_state
+        new_a_1 = self.a_1 + self.dt*self.a_2 + self.ar*self.ad*self.spike
         new_a_2 = -(self.ar + self.ad)*self.a_1 - self.ar * self.ad * self.a_0
         g = K.minimum(self.gmax, self.gmax * new_a_0)
         self.a_0 = new_a_0
@@ -65,3 +65,14 @@ class AlphaSynapse(_KaulosModel):
         self.a_2 = new_a_2
         self.g = g
         self.gm = g
+        self.V_reverse = self.V_reverse * 0.0 + self.V_reverse_default
+
+class AggregatorDendrite(_KaulosModel):
+    params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.)])
+    alters = OrderedDict([('I', 0.0), ('g_modulated', 0.0)])
+    inters = OrderedDict([])
+    accesses = ['g','V','V_reverse']
+    def kaulos_step(self):
+        I = self.g * (self.V - self.V_reverse)
+        self.I = I
+        self.g_modulated = self.g

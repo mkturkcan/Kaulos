@@ -13,7 +13,7 @@ class _KaulosModel(Layer):
         self.update_lpu_attrs(**kwargs)
         self.lpu_attributes.params['dt'] = 1e-3
         self.call_outs = []
-        self.units = int(len(self.alters))
+        self.units = max(int(len(self.accesses)), int(len(self.alters)))
         if len(self.inters)>0:
             self.state_size = [self.units, int(len(self.inters))]
         else:
@@ -31,20 +31,6 @@ class _KaulosModel(Layer):
         else:
             return super(_KaulosModel, self).__getattr__(key)
     def build(self, input_shape):
-        '''
-        for a in self.lpu_attributes.alters:
-            self.lpu_attributes.alters[a] = self.add_weight(
-                shape=(1,1),
-                name=a,
-                initializer=Constant(value=self.lpu_attributes.alters[a]),
-                trainable=False)
-        for a in self.lpu_attributes.inters:
-            self.lpu_attributes.inters[a] = self.add_weight(
-                shape=(1,1),
-                name=a,
-                initializer=Constant(value=self.lpu_attributes.inters[a]),
-                trainable=False)
-        '''
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
         super(_KaulosModel, self).build(input_shape)
@@ -149,6 +135,8 @@ class KaulosWrapperCell(keras.layers.Layer):
         outs = []
         ii = 0
         print(self.state_ind_len)
+        # Loop through components and find the correct indices from the inputs
+        # and the states that belong to them; call them and collect the results
         for i in self.layers:
             print(range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1]))))
             print(range(int(sum(self.state_ind_len[:ii])),int(sum(self.state_ind_len[:ii+1]))))
