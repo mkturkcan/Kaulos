@@ -15,6 +15,7 @@ from keras.models import Model
 import theano.tensor as T
 from keras import backend as K
 from keras.engine.topology import Layer
+from collections import OrderedDict
 import numpy as np
 from keras.layers.recurrent import *
 

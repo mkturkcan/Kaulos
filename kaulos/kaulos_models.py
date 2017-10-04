@@ -3,9 +3,9 @@ from kaulos_engine import _KaulosModel
 
 _BACKEND = 'theano'
 class LeakyIAF(_KaulosModel):
-    params = {'threshold': 1.0, 'R': 1.0, 'C': 1.0}
-    alters = {'V': 0.0, 's': 0.0}
-    states = {}
+    params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
+    alters = OrderedDict([('V', 0.0), ('s', 0.0)])
+    states = OrderedDict([])
     accesses = ['I']
     def __init__(self, **kwargs):
         super(LeakyIAF, self).__init__(**kwargs)
@@ -21,16 +21,15 @@ class LeakyIAF(_KaulosModel):
         updates = []
         updates.append((self.V, V))
         self.add_update(updates)
-        return self.V
-    def compute_output_shape(self, input_shape):
-        return input_shape
+        return self.call_outs
+
 
 
 class HodgkinHuxley(_KaulosModel):
-    params = {'g_K': 36.0,'g_Na': 120.0,'g_l': 0.3,'E_K': -12.,
-              'E_Na': 115.,'E_l': 10.613}
-    alters = {'V': 0.0,'s': 0.0}
-    states = {'n': 0.0,'m': 0.0,'h': 1.0}
+    params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
+              ('E_Na', 115.), ('E_l', 10.613)])
+    alters = OrderedDict([('V', 0.0),('s', 0.0)])
+    states = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0)])
     accesses = ['I']
     def __init__(self, **kwargs):
         super(HodgkinHuxley, self).__init__(**kwargs)
@@ -41,8 +40,8 @@ class HodgkinHuxley(_KaulosModel):
         a_m = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
         a_h = 0.07*K.exp(-self.V/20.0)
 
-        b_n = 4.0*K.exp(-1 * self.V/18.0)
-        b_m = 0.125*K.exp(-1 * self.V/80.0)
+        b_n = 4.0*K.exp(-1.0 * self.V/18.0)
+        b_m = 0.125*K.exp(-1.0 * self.V/80.0)
         b_h = 1.0/(K.exp((30.0-self.V)/10.0)+1.0)
 
         n = self.n + self.dt*(a_n*(1.0-self.n) - b_n*self.n)
@@ -60,14 +59,12 @@ class HodgkinHuxley(_KaulosModel):
         updates.append((self.h, h))
         updates.append((self.V, V))
         self.add_update(updates)
-        return V
-    def compute_output_shape(self, input_shape):
-        return input_shape
+        return self.call_outs
 
 class AlphaSynapse(_KaulosModel):
-    params = {'ar': 1.0, 'ad': 1.0, 'gmax': 100.}
-    alters = {'g': 0.0}
-    states = {'a_0': 0.0,'a_1': 0.0,'a_2': 1.0}
+    params = OrderedDict([('ar', 1.0),('ad', 1.0), ('gmax', 100.)])
+    alters = OrderedDict([('g', 0.0)])
+    states = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 1.0)])
     accesses = ['s']
     def __init__(self,**kwargs):
         super(AlphaSynapse, self).__init__(**kwargs)
@@ -77,7 +74,7 @@ class AlphaSynapse(_KaulosModel):
         new_a_0 = K.maximum( 0. , self.a_0 + self.dt*self.a_1 )
         new_a_1 = self.a_1 + self.dt*self.a_2
         new_a_1 = new_a_1 + self.ar*self.ad*s_ext
-        new_a_2 = -( self.ar+self.ad )*self.a_1 - self.ar*self.ad*self.a_0
+        new_a_2 = -( self.ar + self.ad )*self.a_1 - self.ar * self.ad * self.a_0
         g = new_a_0*self.gmax
         updates = []
         updates.append((self.a_0, new_a_0))
@@ -85,6 +82,4 @@ class AlphaSynapse(_KaulosModel):
         updates.append((self.a_2, new_a_2))
         updates.append((self.g, g))
         self.add_update(updates)
-        return self.g
-    def compute_output_shape(self, input_shape):
-        return input_shape
+        return self.call_outs
