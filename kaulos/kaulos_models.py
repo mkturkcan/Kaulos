@@ -12,15 +12,21 @@ class LeakyIAF(_KaulosModel):
     def build(self, input_shape):
         super(LeakyIAF, self).build(input_shape)
     def call(self, I, S):
-        V_old = S[0]
-        V = self.V + I * self.C
+        SO = S[0]
+        V = SO[:,0:1]
+        s = SO[:,1:2]
+        i = I[:,0:1]
+        V = V + i
+        s = s + 1.0
         if (_BACKEND == 'tensorflow'):
             import tensorflow as tf
             V = tf.where(K.greater(V, self.threshold), 0. * V, V)
         else:
             V = K.switch(K.greater(V, self.threshold), 0. * V, V)
-
-        return V, [V]
+        S = SO
+        S = T.set_subtensor(S[:,0:1], V)
+        S = T.set_subtensor(S[:,1:2], S[:,1:2] * 1.0)
+        return S, [S]
 
 
 
