@@ -40,44 +40,37 @@ class _KaulosModel(Layer):
         for a,b in kwargs.iteritems():
             if a in self.lpu_attributes.params.keys():
                 self.lpu_attributes.params[a] = b
-            if a in self.lpu_attributes.alters.keys():
+            elif a in self.lpu_attributes.alters.keys():
                 self.lpu_attributes.alters[a] = b
-            if a in self.lpu_attributes.inters.keys():
+            elif a in self.lpu_attributes.inters.keys():
                 self.lpu_attributes.inters[a] = b
+            else:
+                raise KeyError("Unrecognized attribute %r for %r" %
+                    (a, self.__class__))
     def acquire(self, I, S):
-        i = 0
-        for a in self.lpu_attributes.alters:
+        for i, a in enumerate(self.lpu_attributes.alters):
             print(a, i)
             self.lpu_attributes.alters[a] = S[0][:,i:i+1]
-            i+=1
-        i = 0
-        for a in self.lpu_attributes.inters:
+        for i, a in enumerate(self.lpu_attributes.inters):
             print(a, i)
             self.lpu_attributes.inters[a] = S[1][:,i:i+1]
-            i+=1
-        i = 0
-        for a in self.lpu_attributes.accesses_tensors:
+        for i, a in enumerate(self.lpu_attributes.accesses_tensors):
             print(a, i)
             self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
-            i+=1
         self.Ot = S[0]
         if len(self.inters)>0:
             self.St = S[1]
     def distribute(self):
-        i = 0
-        for a in self.lpu_attributes.alters:
+        for i, a in enumerate(self.lpu_attributes.alters):
             print(a, i, self.lpu_attributes.alters[a])
             if len(self.lpu_attributes.alters)>1:
                 self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
             else:
                 self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
-            i += 1
         if len(self.inters)>0:
-            i = 0
-            for a in self.lpu_attributes.inters:
+            for i, a in enumerate(self.lpu_attributes.inters):
                 print(a, i)
                 self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-                i += 1
     def call(self, I, S):
         self.acquire(I, S)
         self.kaulos_step()
