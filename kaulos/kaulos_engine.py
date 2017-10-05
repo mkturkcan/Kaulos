@@ -98,7 +98,7 @@ class LPU_Attr():
 
 
 class KaulosWrapperCell(keras.layers.Layer):
-    def __init__(self, layers, **kwargs):
+    def __init__(self, layers, W = None, **kwargs):
         self.units = 0
         self.unit_sizes = []
         self.state_size = [0, 0]
@@ -124,12 +124,21 @@ class KaulosWrapperCell(keras.layers.Layer):
         print("State Size: " + str(self.state_size))
         print("Unit Size per Layer: " + str(self.unit_sizes))
         print("State Size per Layer: " + str(self.state_sizes))
+        self.W = W
         super(KaulosWrapperCell, self).__init__(**kwargs)
     def build(self, input_shape):
         for i in self.layers:
             i.build(input_shape)
+        self.kernel = self.add_weight(name='kernel',
+                                      shape=(self.units, self.units),
+                                      initializer='identity',
+                                      trainable=False)
+        if self.W is not None:
+            self.set_weights([self.W])
         self.built = True
     def call(self, inputs, states):
+        # Update connectivities
+        inputs = K.dot( inputs, self.kernel)
         # Initialize circuit
         out_states = []
         outs = []

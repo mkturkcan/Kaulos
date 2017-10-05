@@ -44,7 +44,7 @@ class HodgkinHuxley(_KaulosModel):
         I_l = self.g_l*(self.V-self.E_l)
         I = I_K + I_Na + I_l
         self.V = self.V + self.dt*(self.I - I)
-        self.s = self.V
+        self.spike = self.V
         self.m = m
         self.n = n
         self.h = h
