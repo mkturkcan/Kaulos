@@ -6,14 +6,12 @@ _BACKEND = 'tensorflow'
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
-    inters = OrderedDict([('V_old', 0.0), ('spike_old', 0.0)])
+    inters = OrderedDict([])
     accesses = ['I']
     def kaulos_step(self):
-        V = self.V_old + self.I
+        V = self.V + self.I
         spike = K.round(V / (2.0 * self.threshold))
         V = V - self.threshold * K.round(V / (2.0 * self.threshold))
-        self.V_old = V
-        self.spike_old = spike
         self.V = V
         self.spike = spike
 

@@ -66,17 +66,17 @@ class _KaulosModel(Layer):
         elif _BACKEND == "tensorflow":
             i = 0
             for a in self.lpu_attributes.alters:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.alters[a] = S[0][:,i:i+1]
                 i+=1
             i = 0
             for a in self.lpu_attributes.inters:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.inters[a] = S[1][:,i:i+1]
                 i+=1
             i = 0
             for a in self.lpu_attributes.accesses_tensors:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
                 i+=1
         else: # Idea for TF splits
@@ -84,17 +84,17 @@ class _KaulosModel(Layer):
             all_ins = tf.split(S[0], [1 for i in range(max(int(len(self.accesses)), int(len(self.alters))))], 1)
             i = 0
             for a in self.lpu_attributes.alters:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.alters[a] = all_vars[i]
                 i+=1
             i = 0
             for a in self.lpu_attributes.inters:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.inters[a] = all_vars[i]
                 i+=1
             i = 0
             for a in self.lpu_attributes.accesses_tensors:
-                print(a, i)
+                #print(a, i)
                 self.lpu_attributes.accesses_tensors[a] = all_ins[i]
                 i+=1
         self.Ot = S[0]
@@ -104,7 +104,7 @@ class _KaulosModel(Layer):
         if _BACKEND == "theano":
             i = 0
             for a in self.lpu_attributes.alters:
-                print(a, i, self.lpu_attributes.alters[a])
+                #print(a, i, self.lpu_attributes.alters[a])
                 if len(self.lpu_attributes.alters)>1:
                     self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
                 else:
@@ -113,14 +113,14 @@ class _KaulosModel(Layer):
             if len(self.inters)>0:
                 i = 0
                 for a in self.lpu_attributes.inters:
-                    print(a, i)
+                    #print(a, i)
                     self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
                     i += 1
         else:
             i = 0
             outs_list = []
             for a in self.lpu_attributes.alters:
-                print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
+                #print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
                 outs_list.append(vars(self)[a])
                 #if len(self.lpu_attributes.alters)>1:
                 #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
@@ -133,7 +133,7 @@ class _KaulosModel(Layer):
             if len(self.inters)>0:
                 i = 0
                 for a in self.lpu_attributes.inters:
-                    print('Added to output from inters: ', a, i)
+                    #print('Added to output from inters: ', a, i)
                     #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
                     state_list.append(vars(self)[a])
                     i += 1
@@ -204,15 +204,15 @@ class KaulosWrapperCell(keras.layers.Layer):
         out_states = []
         outs = []
         ii = 0
-        print(self.state_ind_len)
+        #print(self.state_ind_len)
         # Loop through components and find the correct indices from the inputs
         # and the states that belong to them; call them and collect the results
         #if _BACKEND == 'tensorflow':
         #    tf.concat(states[1],a,[states[0].get_shape()[0], b])
 
         for i in self.layers:
-            print(range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1]))))
-            print(range(int(sum(self.state_ind_len[:ii])),int(sum(self.state_ind_len[:ii+1]))))
+            #print(range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1]))))
+            #print(range(int(sum(self.state_ind_len[:ii])),int(sum(self.state_ind_len[:ii+1]))))
             unit_range = range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1])))
             state_range = range(int(sum(self.state_ind_len[:ii])),int(sum(self.state_ind_len[:ii+1])))
             call_states = []
@@ -252,7 +252,7 @@ class KaulosWrapperCell(keras.layers.Layer):
         if len(outs)>1:
             for i in range(len(outs)-1):
                 output = K.concatenate([output, outs[i+1]], axis=-1)
-        print(out_states)
+        #print(out_states)
         for i in range(len(out_states)):
             if len(out_states[i])>1:
                 if inters_exist == False:
@@ -263,11 +263,11 @@ class KaulosWrapperCell(keras.layers.Layer):
 
         # Finally, add the outputs to the output states
         out_states = [output] + out_states
-        print("Input Tensor: " + str(inputs))
-        print("Input State Tensor: " + str(states))
-        print("Output Tensor: " + str(output))
-        if type(self.state_size) is list:
-            print("Input State Tensor: " + str([output, inters]))
+        #print("Input Tensor: " + str(inputs))
+        #print("Input State Tensor: " + str(states))
+        #print("Output Tensor: " + str(output))
+        #if type(self.state_size) is list:
+        #    print("Input State Tensor: " + str([output, inters]))
         if type(self.state_size) is list:
             return output, [output, inters]
         else:
