@@ -120,24 +120,24 @@ class _KaulosModel(Layer):
             i = 0
             outs_list = []
             for a in self.lpu_attributes.alters:
-                print(a, i, self.lpu_attributes.alters[a])
+                print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
                 outs_list.append(vars(self)[a])
                 #if len(self.lpu_attributes.alters)>1:
                 #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
                 #else:
                 #    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
                 i += 1
-            zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
-            self.Ot = tf.concat(outs_list,zero)
+            #zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
+            self.Ot = tf.concat(outs_list,1)
             state_list = []
             if len(self.inters)>0:
                 i = 0
                 for a in self.lpu_attributes.inters:
-                    print(a, i)
+                    print('Added to output from inters: ', a, i)
                     #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
                     state_list.append(vars(self)[a])
                     i += 1
-            self.St = tf.concat(state_list,zero)
+                    self.St = tf.concat(state_list,1)
             state_list = []
     def call(self, I, S):
         self.acquire(I, S)
@@ -188,8 +188,8 @@ class KaulosWrapperCell(keras.layers.Layer):
         self.W = W
         super(KaulosWrapperCell, self).__init__(**kwargs)
     def build(self, input_shape):
-        for i in self.layers:
-            i.build(input_shape)
+        #for i in self.layers:
+        #    i.build(input_shape)
         self.kernel = self.add_weight(name='kernel',
                                       shape=(self.units, self.units),
                                       initializer='identity',
@@ -207,8 +207,8 @@ class KaulosWrapperCell(keras.layers.Layer):
         print(self.state_ind_len)
         # Loop through components and find the correct indices from the inputs
         # and the states that belong to them; call them and collect the results
-        if _BACKEND == 'tensorflow':
-            tf.concat(states[1],a,[states[0].get_shape()[0], b])
+        #if _BACKEND == 'tensorflow':
+        #    tf.concat(states[1],a,[states[0].get_shape()[0], b])
 
         for i in self.layers:
             print(range(int(sum(self.unit_sizes[:ii])),int(sum(self.unit_sizes[:ii+1]))))
@@ -232,16 +232,16 @@ class KaulosWrapperCell(keras.layers.Layer):
                 ii += 1
             else:
                 if len(unit_range)>1:
-                    a = tf.constant([0,unit_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
-                    b = tf.constant(np.array(unit_range[1:]), dtype=tf.int32, name="kaulos_slice_step")
-                    call_states.append(tf.concat(states[0],a,[states[0].get_shape()[0], b]))
+                    #a = tf.constant([0,unit_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
+                    #b = tf.constant([None, np.array(unit_range[1:])], dtype=tf.int32, name="kaulos_slice_step")
+                    call_states.append(tf.slice(states[0], np.array([0, unit_range[0]]), np.array([-1, len(unit_range)])))
                     if len(self.state_sizes[ii])>1:
-                        a = tf.constant([0,state_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
-                        b = tf.constant(state_range[1:], dtype=tf.int32, name="kaulos_slice_step")
-                        call_states.append(tf.concat(states[1],a,[states[0].get_shape()[0], b]))
-                    a = tf.constant([0,unit_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
-                    b = tf.constant(unit_range[1:], dtype=tf.int32, name="kaulos_slice_step")
-                    a, b = i.call(tf.concat(inputs,a,[inputs.get_shape()[0], b]),call_states)
+                        #a = tf.constant([0,state_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
+                        #b = tf.constant(state_range[1:], dtype=tf.int32, name="kaulos_slice_step")
+                        call_states.append(tf.slice(states[1], np.array([0,state_range[0]]), np.array([-1, len(state_range)])))
+                    #a = tf.constant([0,unit_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
+                    #b = tf.constant(unit_range[1:], dtype=tf.int32, name="kaulos_slice_step")
+                    a, b = i.call(tf.slice(inputs, np.array([0,unit_range[0]]), np.array([-1, len(unit_range)])),call_states)
                 out_states.append(b)
                 outs += [a]
                 ii += 1
@@ -266,7 +266,8 @@ class KaulosWrapperCell(keras.layers.Layer):
         print("Input Tensor: " + str(inputs))
         print("Input State Tensor: " + str(states))
         print("Output Tensor: " + str(output))
-        print("Output State Tensor: " + str(out_states))
+        if type(self.state_size) is list:
+            print("Input State Tensor: " + str([output, inters]))
         if type(self.state_size) is list:
             return output, [output, inters]
         else:

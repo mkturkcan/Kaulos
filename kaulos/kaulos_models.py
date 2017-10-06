@@ -6,15 +6,16 @@ _BACKEND = 'tensorflow'
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
-    inters = OrderedDict([])
+    inters = OrderedDict([('V_old', 0.0), ('spike_old', 0.0)])
     accesses = ['I']
     def kaulos_step(self):
-        V = self.V + self.I
+        V = self.V_old + self.I
         spike = K.round(V / (2.0 * self.threshold))
         V = V - self.threshold * K.round(V / (2.0 * self.threshold))
+        self.V_old = V
+        self.spike_old = spike
         self.V = V
         self.spike = spike
-        print("V: " + str(self.V))
 
 class HodgkinHuxley(_KaulosModel):
     params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
