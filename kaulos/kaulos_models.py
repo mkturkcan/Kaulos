@@ -1,8 +1,8 @@
-from compact_dependencies import *
+from .compact_dependencies import *
 from keras.layers.recurrent import RNN
-from kaulos_engine import _KaulosModel
+from .kaulos_engine import _KaulosModel
 
-_BACKEND = 'theano'
+_BACKEND = 'tensorflow'
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
@@ -10,12 +10,8 @@ class LeakyIAF(_KaulosModel):
     accesses = ['I']
     def kaulos_step(self):
         V = self.V + self.I
-        if (_BACKEND == 'tensorflow'):
-            import tensorflow as tf
-            V = tf.where(K.greater(V, self.threshold), 0. * V, V)
-        else:
-            spike = K.round(V / (2.0 * self.threshold))
-            V = V - self.threshold * K.round(V / (2.0 * self.threshold))
+        spike = K.round(V / (2.0 * self.threshold))
+        V = V - self.threshold * K.round(V / (2.0 * self.threshold))
         self.V = V
         self.spike = spike
         print("V: " + str(self.V))
