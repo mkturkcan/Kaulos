@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 
-_BACKEND = "tensorflow"
+_BACKEND = keras.backend.backend()
 
 import sys
 sys.setrecursionlimit(10000)

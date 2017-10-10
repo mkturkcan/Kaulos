@@ -2,7 +2,8 @@ from .compact_dependencies import *
 from keras.layers.recurrent import RNN
 from .kaulos_engine import _KaulosModel
 
-_BACKEND = 'tensorflow'
+_BACKEND = keras.backend.backend()
+
 class LeakyIAF(_KaulosModel):
     """
     Membrane model for a leaky integrate-and-fire neuron.

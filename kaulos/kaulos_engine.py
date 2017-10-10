@@ -1,6 +1,6 @@
 from .compact_dependencies import *
 
-_BACKEND = 'tensorflow'
+_BACKEND = keras.backend.backend()
 
 class _KaulosModel(Layer):
     def __init__(self, **kwargs):
