@@ -1,6 +1,9 @@
 from .compact_dependencies import *
+from functools import wraps
 
 _BACKEND = keras.backend.backend()
+
+
 
 class _KaulosModel(Layer):
     def __init__(self, **kwargs):
@@ -21,6 +24,9 @@ class _KaulosModel(Layer):
         else:
             self.state_size = [self.units]
         super(_KaulosModel, self).__init__(**kwargs)
+
+        #
+        # self.distribute = getattr(self, '_%s_distribute' % _BACKEND)
     def __getattr__(self, key):
         if key in self.lpu_attributes.params:
             return self.lpu_attributes.params[key]
@@ -32,6 +38,23 @@ class _KaulosModel(Layer):
             return self.lpu_attributes.accesses_tensors[key]
         else:
             return super(_KaulosModel, self).__getattr__(key)
+
+
+    def backend_dependent(func):
+        """A decorator for binding backend-specific function.
+        """
+        backend_dependent_func = "_%s_%s" % (_BACKEND, func.__name__)
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            """The backend-speicific function will be evoked throgh the wrapper
+            function, and replace the wrapper the first time the wrapper is
+            called.
+            """
+            new_func =  getattr(self, backend_dependent_func)
+            setattr(self, func.__name__, new_func)
+            return new_func(*args, **kwargs)
+        return wrapper
+
     def build(self, input_shape):
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
@@ -100,45 +123,36 @@ class _KaulosModel(Layer):
         self.Ot = S[0]
         if len(self.inters)>0:
             self.St = S[1]
+
+    @backend_dependent
     def distribute(self):
-        if _BACKEND == "theano":
-            i = 0
-            for a in self.lpu_attributes.alters:
-                #print(a, i, self.lpu_attributes.alters[a])
-                if len(self.lpu_attributes.alters)>1:
-                    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
-                else:
-                    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
-                i += 1
-            if len(self.inters)>0:
-                i = 0
-                for a in self.lpu_attributes.inters:
-                    #print(a, i)
-                    self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-                    i += 1
-        else:
-            i = 0
-            outs_list = []
-            for a in self.lpu_attributes.alters:
-                #print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
-                outs_list.append(vars(self)[a])
-                #if len(self.lpu_attributes.alters)>1:
-                #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
-                #else:
-                #    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
-                i += 1
-            #zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
-            self.Ot = tf.concat(outs_list,1)
-            state_list = []
-            if len(self.inters)>0:
-                i = 0
-                for a in self.lpu_attributes.inters:
-                    #print('Added to output from inters: ', a, i)
-                    #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-                    state_list.append(vars(self)[a])
-                    i += 1
-                    self.St = tf.concat(state_list,1)
-            state_list = []
+        """Distrubte default value of parameters to state variables
+
+        This function will be overloaded by backend-speicific implementation:
+            1. _theano_distribute
+            2. _tensorflow_distribute
+        """
+        pass
+
+
+    def _theano_distribute(self):
+        for i, a in enumerate(self.lpu_attributes.alters):
+            if len(self.lpu_attributes.alters)>1:
+                self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
+            else:
+                self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
+        if len(self.inters)>0:
+            for i, v in enumerate(self.lpu_attributes.inters.values):
+                self.St = T.set_subtensor(self.St[:,i:i+1], v)
+
+    def _tensorflow_distribute(self):
+        outs_list = [v for v in self.lpu_attributes.alters.values()]
+        self.Ot = tf.concat(outs_list,1)
+
+        if len(self.inters)>0:
+            state_list = [v for v in self.lpu_attributes.inters.values()]
+            self.St = tf.concat(state_list,1)
+
     def call(self, I, S):
         self.acquire(I, S)
         self.kaulos_step()
