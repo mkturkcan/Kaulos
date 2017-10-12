@@ -25,8 +25,6 @@ class _KaulosModel(Layer):
             self.state_size = [self.units]
         super(_KaulosModel, self).__init__(**kwargs)
 
-        #
-        # self.distribute = getattr(self, '_%s_distribute' % _BACKEND)
     def __getattr__(self, key):
         if key in self.lpu_attributes.params:
             return self.lpu_attributes.params[key]
@@ -59,8 +57,10 @@ class _KaulosModel(Layer):
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
         super(_KaulosModel, self).build(input_shape)
+
     def compute_output_shape(self, input_shape):
         return (None, len(self.alters))
+
     def update_lpu_attrs(self, **kwargs):
         for a,b in kwargs.items():
             if a in self.lpu_attributes.params.keys():
@@ -69,57 +69,38 @@ class _KaulosModel(Layer):
                 self.lpu_attributes.alters[a] = b
             if a in self.lpu_attributes.inters.keys():
                 self.lpu_attributes.inters[a] = b
+
+    @backend_dependent
     def acquire(self, I, S):
-        if _BACKEND == "theano":
-            i = 0
-            for a in self.lpu_attributes.alters:
-                print(a, i)
-                self.lpu_attributes.alters[a] = S[0][:,i:i+1]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.inters:
-                print(a, i)
-                self.lpu_attributes.inters[a] = S[1][:,i:i+1]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.accesses_tensors:
-                print(a, i)
-                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
-                i+=1
-        elif _BACKEND == "tensorflow":
-            i = 0
-            for a in self.lpu_attributes.alters:
-                #print(a, i)
-                self.lpu_attributes.alters[a] = S[0][:,i:i+1]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.inters:
-                #print(a, i)
-                self.lpu_attributes.inters[a] = S[1][:,i:i+1]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.accesses_tensors:
-                #print(a, i)
-                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
-                i+=1
-        else: # Idea for TF splits
-            all_vars = tf.split(S[0], [1 for i in range(len(self.lpu_attributes.alters.keys()) + len(self.lpu_attributes.inters.keys()))], 1)
-            all_ins = tf.split(S[0], [1 for i in range(max(int(len(self.accesses)), int(len(self.alters))))], 1)
-            i = 0
-            for a in self.lpu_attributes.alters:
-                #print(a, i)
-                self.lpu_attributes.alters[a] = all_vars[i]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.inters:
-                #print(a, i)
-                self.lpu_attributes.inters[a] = all_vars[i]
-                i+=1
-            i = 0
-            for a in self.lpu_attributes.accesses_tensors:
-                #print(a, i)
-                self.lpu_attributes.accesses_tensors[a] = all_ins[i]
-                i+=1
+        """
+        This function will be overloaded by backend-speicific implementation:
+            1. _theano_acquire
+            2. _tensorflow_acquire
+        """
+        pass
+
+    def _theano_acquire(self, I, S):
+        for i, a in enumerate(self.lpu_attributes.alters):
+            self.lpu_attributes.alters[a] = S[0][:,i:i+1]
+        for i, a in enumerate(self.lpu_attributes.inters):
+            self.lpu_attributes.inters[a] = S[1][:,i:i+1]
+        for i, a in enumerate(self.lpu_attributes.accesses_tensors):
+            self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
+        self.Ot = S[0]
+        if len(self.inters)>0:
+            self.St = S[1]
+
+    def _tensorflow_acquire(self, I, S):
+        n = len(self.lpu_attributes.alters)
+        m = len(self.lpu_attributes.inters)
+        all_vars = tf.split(S[0], [1]*(n+m), 1)
+        all_ins = tf.split(S[0], [1]*max(n,m), 1)
+        for i, a in enumerate(self.lpu_attributes.alters):
+            self.lpu_attributes.alters[a] = all_vars[i]
+        for i, a in enumerate(self.lpu_attributes.inters):
+            self.lpu_attributes.inters[a] = all_vars[n+i]
+        for i, a in enumerate(self.lpu_attributes.accesses_tensors):
+            self.lpu_attributes.accesses_tensors[a] = all_ins[i]
         self.Ot = S[0]
         if len(self.inters)>0:
             self.St = S[1]
@@ -133,7 +114,6 @@ class _KaulosModel(Layer):
             2. _tensorflow_distribute
         """
         pass
-
 
     def _theano_distribute(self):
         for i, a in enumerate(self.lpu_attributes.alters):
@@ -163,6 +143,7 @@ class _KaulosModel(Layer):
             return self.Ot, [self.Ot]
     def kaulos_step():
         pass
+
 class LPU_Attr():
     def __init__(self, **kwargs):
         self.accesses = []
