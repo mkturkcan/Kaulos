@@ -1,26 +1,28 @@
-from compact_dependencies import *
+from .compact_dependencies import *
 from keras.layers.recurrent import RNN
-from kaulos_engine import _KaulosModel
+from .kaulos_engine import _KaulosModel
 
-_BACKEND = 'theano'
+_BACKEND = keras.backend.backend()
+
 class LeakyIAF(_KaulosModel):
+    """
+    Membrane model for a leaky integrate-and-fire neuron.
+    """
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
     inters = OrderedDict([])
     accesses = ['I']
     def kaulos_step(self):
         V = self.V + self.I
-        if (_BACKEND == 'tensorflow'):
-            import tensorflow as tf
-            V = tf.where(K.greater(V, self.threshold), 0. * V, V)
-        else:
-            spike = K.round(V / (2.0 * self.threshold))
-            V = V - self.threshold * K.round(V / (2.0 * self.threshold))
+        spike = K.round(V / (2.0 * self.threshold))
+        V = V - self.threshold * K.round(V / (2.0 * self.threshold))
         self.V = V
         self.spike = spike
-        print("V: " + str(self.V))
 
 class HodgkinHuxley(_KaulosModel):
+    """
+    Membrane model for a Hodgkin-Huxley neuron with standard parameters.
+    """
     params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
               ('E_Na', 115.), ('E_l', 10.613)])
     alters = OrderedDict([('V', 0.0),('spike', 0.0)])
@@ -51,6 +53,9 @@ class HodgkinHuxley(_KaulosModel):
         self.m = m
 
 class AlphaSynapse(_KaulosModel):
+    """
+    The alpha synapse model.
+    """
     params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.), ('V_reverse_default', 100.)])
     alters = OrderedDict([('g', 0.0), ('V_reverse', 100.)])
     inters = OrderedDict([('a_0', 0.0),('a_1', 0.0),('a_2', 0.0)])
@@ -68,6 +73,9 @@ class AlphaSynapse(_KaulosModel):
         self.V_reverse = self.V_reverse * 0.0 + self.V_reverse_default
 
 class AggregatorDendrite(_KaulosModel):
+    """
+    A dendrite model for connecting synapses to neuron membranes.
+    """
     params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.)])
     alters = OrderedDict([('I', 0.0), ('g_modulated', 0.0)])
     inters = OrderedDict([])

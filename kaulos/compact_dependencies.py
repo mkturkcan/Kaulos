@@ -1,5 +1,7 @@
 from __future__ import division, print_function
 
+_BACKEND = keras.backend.backend()
+
 import sys
 sys.setrecursionlimit(10000)
 from keras.layers import Lambda
@@ -12,7 +14,10 @@ from keras import initializers
 from keras.optimizers import RMSprop, Adam
 from keras.initializers import Constant
 from keras.models import Model
-import theano.tensor as T
+if _BACKEND != "tensorflow":
+    import theano.tensor as T
+else:
+    import tensorflow as tf
 from keras import backend as K
 from keras.engine.topology import Layer
 from collections import OrderedDict
