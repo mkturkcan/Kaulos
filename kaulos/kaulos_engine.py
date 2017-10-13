@@ -35,6 +35,11 @@ class _KaulosModel(Layer):
     def build(self, input_shape):
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
+        if a in self.lpu_attributes.params.keys():
+            self.lpu_attributes.params[a] = self.add_weight(name=a,
+                                          shape=1,
+                                          initializer=Constant(value=b),
+                                          trainable=self.lpu_attributes.params_trainable[a])
         super(_KaulosModel, self).build(input_shape)
     def compute_output_shape(self, input_shape):
         return (None, len(self.alters))
@@ -42,10 +47,15 @@ class _KaulosModel(Layer):
         for a,b in kwargs.items():
             if a in self.lpu_attributes.params.keys():
                 self.lpu_attributes.params[a] = b
+                self.lpu_attributes.params_trainable[a] = False
             if a in self.lpu_attributes.alters.keys():
                 self.lpu_attributes.alters[a] = b
             if a in self.lpu_attributes.inters.keys():
                 self.lpu_attributes.inters[a] = b
+        if 'params_trainable' in kwargs.keys():
+            for a,b in kwargs['params_trainable'].items():
+                if a in self.lpu_attributes.params.keys():
+                    self.lpu_attributes.params_trainable[a] = True
     def acquire(self, I, S):
         if _BACKEND == "theano":
             i = 0
@@ -153,6 +163,7 @@ class LPU_Attr():
     def __init__(self, **kwargs):
         self.accesses = []
         self.params = OrderedDict()
+        self.params_trainable = OrderedDict()
         self.alters = OrderedDict()
         self.inters = OrderedDict()
 
