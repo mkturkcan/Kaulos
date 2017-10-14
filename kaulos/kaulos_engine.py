@@ -25,6 +25,26 @@ class _KaulosModel(Layer):
             self.state_size = [self.units]
         super(_KaulosModel, self).__init__(**kwargs)
 
+    def __setattr__(self, key, value):
+        if hasattr(self, 'lpu_attributes'):
+            if key in self.lpu_attributes.params:
+                self.lpu_attributes.params[key] = value
+                return
+            if key in self.lpu_attributes.alters:
+                self.lpu_attributes.alters[key]  = value
+                return
+            if key in self.lpu_attributes.inters:
+                self.lpu_attributes.inters[key]  = value
+                return
+            if key in self.lpu_attributes.accesses_tensors:
+                self.lpu_attributes.accesses_tensors[key]  = value
+                return
+            else:
+                super(_KaulosModel, self).__setattr__(key, value)
+        else:
+            super(_KaulosModel, self).__setattr__(key, value)
+
+
     def __getattr__(self, key):
         if key in self.lpu_attributes.params:
             return self.lpu_attributes.params[key]
@@ -91,16 +111,12 @@ class _KaulosModel(Layer):
             self.St = S[1]
 
     def _tensorflow_acquire(self, I, S):
-        n = len(self.lpu_attributes.alters)
-        m = len(self.lpu_attributes.inters)
-        all_vars = tf.split(S[0], [1]*(n+m), 1)
-        all_ins = tf.split(S[0], [1]*max(n,m), 1)
         for i, a in enumerate(self.lpu_attributes.alters):
-            self.lpu_attributes.alters[a] = all_vars[i]
+            self.lpu_attributes.alters[a] = S[0][:,i:i+1]
         for i, a in enumerate(self.lpu_attributes.inters):
-            self.lpu_attributes.inters[a] = all_vars[n+i]
+            self.lpu_attributes.inters[a] = S[1][:,i:i+1]
         for i, a in enumerate(self.lpu_attributes.accesses_tensors):
-            self.lpu_attributes.accesses_tensors[a] = all_ins[i]
+            self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
         self.Ot = S[0]
         if len(self.inters)>0:
             self.St = S[1]
@@ -116,22 +132,53 @@ class _KaulosModel(Layer):
         pass
 
     def _theano_distribute(self):
-        for i, a in enumerate(self.lpu_attributes.alters):
+        for i, v in enumerate(self.lpu_attributes.alters.values()):
             if len(self.lpu_attributes.alters)>1:
-                self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
+                self.Ot = T.set_subtensor(self.Ot[:,i:i+1], v)
             else:
-                self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
+                self.Ot = T.set_subtensor(self.Ot[:,:], v)
         if len(self.inters)>0:
-            for i, v in enumerate(self.lpu_attributes.inters.values):
+            for i, v in enumerate(self.lpu_attributes.inters.values()):
                 self.St = T.set_subtensor(self.St[:,i:i+1], v)
 
     def _tensorflow_distribute(self):
+        # i = 0
+        # outs_list = []
+        # for a in self.lpu_attributes.alters:
+        #     #print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
+        #     outs_list.append(vars(self)[a])
+        #     #if len(self.lpu_attributes.alters)>1:
+        #     #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
+        #     #else:
+        #     #    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
+        #     i += 1
+        # #zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
+        # self.Ot = tf.concat(outs_list,1)
+        # state_list = []
+        # if len(self.inters)>0:
+        #     i = 0
+        #     for a in self.lpu_attributes.inters:
+        #         #print('Added to output from inters: ', a, i)
+        #         #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
+        #         state_list.append(vars(self)[a])
+        #         i += 1
+        #         self.St = tf.concat(state_list,1)
+
         outs_list = [v for v in self.lpu_attributes.alters.values()]
         self.Ot = tf.concat(outs_list,1)
 
         if len(self.inters)>0:
             state_list = [v for v in self.lpu_attributes.inters.values()]
             self.St = tf.concat(state_list,1)
+        #     state_list = []
+        #     i = 0
+        #     for a in self.lpu_attributes.inters:
+        #         #print('Added to output from inters: ', a, i)
+        #         #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
+        #         state_list.append(vars(self)[a])
+        #         i += 1
+        #         self.St = tf.concat(state_list,1)
+
 
     def call(self, I, S):
         self.acquire(I, S)
@@ -150,7 +197,6 @@ class LPU_Attr():
         self.params = OrderedDict()
         self.alters = OrderedDict()
         self.inters = OrderedDict()
-
 
 
 class KaulosWrapperCell(keras.layers.Layer):
