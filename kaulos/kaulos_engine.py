@@ -27,36 +27,21 @@ class _KaulosModel(Layer):
 
     def __setattr__(self, key, value):
         if hasattr(self, 'lpu_attributes'):
-            if key in self.lpu_attributes.params:
-                self.lpu_attributes.params[key] = value
-                return
-            if key in self.lpu_attributes.alters:
-                self.lpu_attributes.alters[key]  = value
-                return
-            if key in self.lpu_attributes.inters:
-                self.lpu_attributes.inters[key]  = value
-                return
-            if key in self.lpu_attributes.accesses_tensors:
-                self.lpu_attributes.accesses_tensors[key]  = value
-                return
-            else:
-                super(_KaulosModel, self).__setattr__(key, value)
-        else:
-            super(_KaulosModel, self).__setattr__(key, value)
-
+            la = self.lpu_attributes
+            for p in (la.accesses_tensors, la.params, la.alters, la.inters):
+                if key in p:
+                    p[key] = value
+                    return
+        super(_KaulosModel, self).__setattr__(key, value)
 
     def __getattr__(self, key):
-        if key in self.lpu_attributes.params:
-            return self.lpu_attributes.params[key]
-        if key in self.lpu_attributes.alters:
-            return self.lpu_attributes.alters[key]
-        if key in self.lpu_attributes.inters:
-            return self.lpu_attributes.inters[key]
-        if key in self.lpu_attributes.accesses_tensors:
-            return self.lpu_attributes.accesses_tensors[key]
-        else:
-            return super(_KaulosModel, self).__getattr__(key)
-
+        for p in ('accesses_tensors', 'params', 'alters', 'inters'):
+            attr = getattr(self.lpu_attributes, p)
+            if key == p:
+                return attr
+            if key in attr:
+                return attr[key]
+        return super(_KaulosModel, self).__getattribute__(key)
 
     def backend_dependent(func):
         """A decorator for binding backend-specific function.
@@ -197,6 +182,7 @@ class LPU_Attr():
         self.params = OrderedDict()
         self.alters = OrderedDict()
         self.inters = OrderedDict()
+
 
 
 class KaulosWrapperCell(keras.layers.Layer):
