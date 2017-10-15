@@ -3,8 +3,6 @@ from functools import wraps
 
 _BACKEND = keras.backend.backend()
 
-
-
 class _KaulosModel(Layer):
     def __init__(self, **kwargs):
         self.lpu_attributes = LPU_Attr()
@@ -28,14 +26,14 @@ class _KaulosModel(Layer):
     def __setattr__(self, key, value):
         if hasattr(self, 'lpu_attributes'):
             la = self.lpu_attributes
-            for p in (la.accesses_tensors, la.params, la.alters, la.inters):
+            for p in (la.accesses_tensors, la.params, la.alters, la.inters, la.params_trainable):
                 if key in p:
                     p[key] = value
                     return
         super(_KaulosModel, self).__setattr__(key, value)
 
     def __getattr__(self, key):
-        for p in ('accesses_tensors', 'params', 'alters', 'inters'):
+        for p in ('accesses_tensors', 'params', 'alters', 'inters', 'params_trainable'):
             attr = getattr(self.lpu_attributes, p)
             if key == p:
                 return attr
@@ -61,6 +59,11 @@ class _KaulosModel(Layer):
     def build(self, input_shape):
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
+        if a in self.lpu_attributes.params.keys():
+            self.lpu_attributes.params[a] = self.add_weight(name=a,
+                                          shape=1,
+                                          initializer=Constant(value=b),
+                                          trainable=self.lpu_attributes.params_trainable[a])
         super(_KaulosModel, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
@@ -70,10 +73,15 @@ class _KaulosModel(Layer):
         for a,b in kwargs.items():
             if a in self.lpu_attributes.params.keys():
                 self.lpu_attributes.params[a] = b
+                self.lpu_attributes.params_trainable[a] = False
             if a in self.lpu_attributes.alters.keys():
                 self.lpu_attributes.alters[a] = b
             if a in self.lpu_attributes.inters.keys():
                 self.lpu_attributes.inters[a] = b
+        if 'params_trainable' in kwargs.keys():
+            for a,b in kwargs['params_trainable'].items():
+                if a in self.lpu_attributes.params.keys():
+                    self.lpu_attributes.params_trainable[a] = True
 
     @backend_dependent
     def acquire(self, I, S):
@@ -127,43 +135,12 @@ class _KaulosModel(Layer):
                 self.St = T.set_subtensor(self.St[:,i:i+1], v)
 
     def _tensorflow_distribute(self):
-        # i = 0
-        # outs_list = []
-        # for a in self.lpu_attributes.alters:
-        #     #print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
-        #     outs_list.append(vars(self)[a])
-        #     #if len(self.lpu_attributes.alters)>1:
-        #     #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
-        #     #else:
-        #     #    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
-        #     i += 1
-        # #zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
-        # self.Ot = tf.concat(outs_list,1)
-        # state_list = []
-        # if len(self.inters)>0:
-        #     i = 0
-        #     for a in self.lpu_attributes.inters:
-        #         #print('Added to output from inters: ', a, i)
-        #         #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-        #         state_list.append(vars(self)[a])
-        #         i += 1
-        #         self.St = tf.concat(state_list,1)
-
         outs_list = [v for v in self.lpu_attributes.alters.values()]
         self.Ot = tf.concat(outs_list,1)
 
         if len(self.inters)>0:
             state_list = [v for v in self.lpu_attributes.inters.values()]
             self.St = tf.concat(state_list,1)
-        #     state_list = []
-        #     i = 0
-        #     for a in self.lpu_attributes.inters:
-        #         #print('Added to output from inters: ', a, i)
-        #         #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
-        #         state_list.append(vars(self)[a])
-        #         i += 1
-        #         self.St = tf.concat(state_list,1)
-
 
     def call(self, I, S):
         self.acquire(I, S)
@@ -180,10 +157,9 @@ class LPU_Attr():
     def __init__(self, **kwargs):
         self.accesses = []
         self.params = OrderedDict()
+        self.params_trainable = OrderedDict()
         self.alters = OrderedDict()
         self.inters = OrderedDict()
-
-
 
 class KaulosWrapperCell(keras.layers.Layer):
     def __init__(self, layers, W = None, **kwargs):
