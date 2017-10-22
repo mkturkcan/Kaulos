@@ -1,13 +1,11 @@
 from __future__ import division, print_function
 
+_BACKEND = "tensorflow"
+
 import sys
 sys.setrecursionlimit(10000)
 from keras.layers import Lambda
 import keras
-
-_BACKEND = keras.backend.backend()
-
-
 from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Conv1D, Flatten, Lambda, Concatenate, Input, Reshape, BatchNormalization
