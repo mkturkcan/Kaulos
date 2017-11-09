@@ -3,13 +3,25 @@ from keras.layers.recurrent import RNN
 from .kaulos_engine import _KaulosModel
 
 _BACKEND = 'tensorflow'
+class IdealIAF(_KaulosModel):
+    params = OrderedDict([('threshold', 1.0), ('C', 1.0)])
+    alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
+    inters = OrderedDict([])
+    accesses = ['I']
+    def kaulos_step(self):
+        V = self.V + self.dt * self.I / self.C
+        spike = K.round(V / (2.0 * self.threshold))
+        V = V - self.threshold * K.round(V / (2.0 * self.threshold))
+        self.V = V
+        self.spike = spike
+
 class LeakyIAF(_KaulosModel):
     params = OrderedDict([('threshold', 1.0), ('R', 1.0), ('C', 1.0)])
     alters = OrderedDict([('V', 0.0), ('spike', 0.0)])
     inters = OrderedDict([])
     accesses = ['I']
     def kaulos_step(self):
-        V = self.V + self.I
+        V = self.V + self.dt * self.I / self.C - self.V / (self.R * self.C)
         spike = K.round(V / (2.0 * self.threshold))
         V = V - self.threshold * K.round(V / (2.0 * self.threshold))
         self.V = V
@@ -19,9 +31,11 @@ class HodgkinHuxley(_KaulosModel):
     params = OrderedDict([('g_K', 36.0),('g_Na', 120.0),('g_l', 0.3),('E_K', -12.),
               ('E_Na', 115.), ('E_l', 10.613)])
     alters = OrderedDict([('V', 0.0),('spike', 0.0)])
-    inters = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0)])
+    inters = OrderedDict([('n', 0.0),('m', 0.0),('h', 1.0),('Vprev1', 0.0),('Vprev2', 0.0)])
     accesses = ['I']
     def kaulos_step(self):
+        self.Vprev2 = self.Vprev1
+        self.Vprev1 = self.V
         a_n = (25.0-self.V)/(10.0*(K.exp((25.0-self.V)/10.0)-1.0))
         a_m = (10.0-self.V)/(100.0*(K.exp((10.0-self.V)/10.0)-1.0))
         a_h = 0.07*K.exp(-self.V/20.0)
@@ -33,17 +47,18 @@ class HodgkinHuxley(_KaulosModel):
         n = self.n + self.dt*(a_n*(1.0-self.n) - b_n*self.n)
         m = self.m + self.dt*(a_m*(1.0-self.m) - b_m*self.m)
         h = self.h + self.dt*(a_h*(1.0-self.h) - b_h*self.h)
-
-        I_K = self.g_K*K.pow(m, 4)*(self.V-self.E_K)
-        I_Na = self.g_Na*K.pow(n, 3)*h*(self.V-self.E_Na)
-        I_l = self.g_l*(self.V-self.E_l)
-        I = I_K + I_Na + I_l
-        self.V = self.V + self.dt*(self.I - I)
-        self.spike = self.V
         self.m = m
         self.n = n
         self.h = h
-        self.m = m
+        I_K = self.g_K*K.pow(self.m, 4)*(self.V-self.E_K)
+        I_Na = self.g_Na*K.pow(self.n, 3)*h*(self.V-self.E_Na)
+        I_l = self.g_l*(self.V-self.E_l)
+        I_channels = I_K + I_Na + I_l
+        V = self.V + self.dt*(self.I - I_channels)
+        self.V = V
+        spike = K.cast(K.greater(self.Vprev1, self.V), 'float32') * K.cast(K.less(self.Vprev2,self.Vprev1), 'float32') * K.cast(K.greater(self.V, -30.), 'float32')
+        self.spike = spike
+
 
 class AlphaSynapse(_KaulosModel):
     params = OrderedDict([('ar', 4.0),('ad', 4.0), ('gmax', 100.), ('V_reverse_default', 100.)])

@@ -3,22 +3,23 @@ from .compact_dependencies import *
 _BACKEND = keras.backend.backend()
 
 class _KaulosModel(Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, component_units = 1, **kwargs):
+        self._COMPONENT_UNITS = component_units
         self.lpu_attributes = LPU_Attr()
         self.lpu_attributes.params = self.params
         self.lpu_attributes.alters = self.alters
         self.lpu_attributes.inters = self.inters
         self.lpu_attributes.accesses = self.accesses
         self.lpu_attributes.accesses_tensors = OrderedDict()
+        if 'dt' not in self.lpu_attributes.params.keys():
+            self.lpu_attributes.params['dt'] = 1e-3
         for i in self.accesses:
             self.lpu_attributes.accesses_tensors[i] = None
         self.update_lpu_attrs(**kwargs)
-        if 'dt' not in self.lpu_attributes.params.keys():
-            self.lpu_attributes.params['dt'] = 1e-3
         self.call_outs = []
-        self.units = max(int(len(self.accesses)), int(len(self.alters)))
+        self.units = max(int(self._COMPONENT_UNITS * len(self.accesses)), int(self._COMPONENT_UNITS * len(self.alters)))
         if len(self.inters)>0:
-            self.state_size = [self.units, int(len(self.inters))]
+            self.state_size = [self.units, int(self._COMPONENT_UNITS * len(self.inters))]
         else:
             self.state_size = [self.units]
         super(_KaulosModel, self).__init__()
@@ -42,17 +43,39 @@ class _KaulosModel(Layer):
     def compute_output_shape(self, input_shape):
         return (None, len(self.alters))
     def update_lpu_attrs(self, **kwargs):
-        for a,b in kwargs.items():
-            if a in self.lpu_attributes.params.keys():
-                self.lpu_attributes.params[a] = b
-                self.lpu_attributes.params_trainable[a] = False
-            if a in self.lpu_attributes.alters.keys():
-                self.lpu_attributes.alters[a] = b
-            if a in self.lpu_attributes.inters.keys():
-                self.lpu_attributes.inters[a] = b
-            if a == 'dt':
-                self.lpu_attributes.params[a] = b
-                self.lpu_attributes.params_trainable[a] = False
+        if self._COMPONENT_UNITS>1:
+            for a,b in kwargs.items():
+                if a == 'dt':
+                    self.lpu_attributes.params[a] = b
+                    self.lpu_attributes.params_trainable[a] = False
+                elif a in self.lpu_attributes.params.keys():
+                    self.lpu_attributes.params[a] = self.add_weight(name=a,
+                                                  shape=(1,self._COMPONENT_UNITS),
+                                                  initializer=b,
+                                                  trainable=self.lpu_attributes.params_trainable[a])
+                    self.lpu_attributes.params_trainable[a] = False
+                if a in self.lpu_attributes.alters.keys():
+                    self.lpu_attributes.alters[a] = self.add_weight(name=a,
+                                                  shape=(1,self._COMPONENT_UNITS),
+                                                  initializer=b,
+                                                  trainable=self.lpu_attributes.params_trainable[a])
+                if a in self.lpu_attributes.inters.keys():
+                    self.lpu_attributes.inters[a] = self.add_weight(name=a,
+                                                  shape=(1,self._COMPONENT_UNITS),
+                                                  initializer=b,
+                                                  trainable=self.lpu_attributes.params_trainable[a])
+        else:
+            for a,b in kwargs.items():
+                if a in self.lpu_attributes.params.keys():
+                    self.lpu_attributes.params[a] = b
+                    self.lpu_attributes.params_trainable[a] = False
+                if a in self.lpu_attributes.alters.keys():
+                    self.lpu_attributes.alters[a] = b
+                if a in self.lpu_attributes.inters.keys():
+                    self.lpu_attributes.inters[a] = b
+                if a == 'dt':
+                    self.lpu_attributes.params[a] = b
+                    self.lpu_attributes.params_trainable[a] = False
     def add_param_weights(self, **kwargs):
         if 'params_trainable' in kwargs.keys():
             for a in kwargs['params_trainable']:
@@ -63,45 +86,45 @@ class _KaulosModel(Layer):
                     print(self.lpu_attributes.params_trainable[a])
                     print(self.lpu_attributes.params[a])
                     self.lpu_attributes.params[a] = self.add_weight(name=a,
-                                                  shape=(1,1),
+                                                  shape=(1,self._COMPONENT_UNITS),
                                                   initializer=Constant(value=float(self.lpu_attributes.params[a])),
                                                   trainable=self.lpu_attributes.params_trainable[a])
     def acquire(self, I, S):
         if _BACKEND == "theano":
             i = 0
             for a in self.lpu_attributes.alters:
-                print(a, i)
-                self.lpu_attributes.alters[a] = S[0][:,i:i+1]
+                #print(a, i)
+                self.lpu_attributes.alters[a] = S[0][:,i:i+self._COMPONENT_UNITS]
                 i+=1
             i = 0
             for a in self.lpu_attributes.inters:
-                print(a, i)
-                self.lpu_attributes.inters[a] = S[1][:,i:i+1]
+                #print(a, i)
+                self.lpu_attributes.inters[a] = S[1][:,i:i+self._COMPONENT_UNITS]
                 i+=1
             i = 0
             for a in self.lpu_attributes.accesses_tensors:
-                print(a, i)
-                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
+                #print(a, i)
+                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+self._COMPONENT_UNITS]
                 i+=1
         elif _BACKEND == "tensorflow":
             i = 0
             for a in self.lpu_attributes.alters:
                 #print(a, i)
-                self.lpu_attributes.alters[a] = S[0][:,i:i+1]
-                i+=1
+                self.lpu_attributes.alters[a] = S[0][:,i:i+self._COMPONENT_UNITS]
+                i+=self._COMPONENT_UNITS
             i = 0
             for a in self.lpu_attributes.inters:
                 #print(a, i)
-                self.lpu_attributes.inters[a] = S[1][:,i:i+1]
-                i+=1
+                self.lpu_attributes.inters[a] = S[1][:,i:i+self._COMPONENT_UNITS]
+                i+=self._COMPONENT_UNITS
             i = 0
             for a in self.lpu_attributes.accesses_tensors:
                 #print(a, i)
-                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+1]
-                i+=1
+                self.lpu_attributes.accesses_tensors[a] = I[:,i:i+self._COMPONENT_UNITS]
+                i+=self._COMPONENT_UNITS
         else: # Idea for TF splits
-            all_vars = tf.split(S[0], [1 for i in range(len(self.lpu_attributes.alters.keys()) + len(self.lpu_attributes.inters.keys()))], 1)
-            all_ins = tf.split(S[0], [1 for i in range(max(int(len(self.accesses)), int(len(self.alters))))], 1)
+            all_vars = tf.split(S[0], [1 for i in range(len(self.lpu_attributes.alters.keys()) + len(self.lpu_attributes.inters.keys()))], self._COMPONENT_UNITS)
+            all_ins = tf.split(S[0], [1 for i in range(max(int(len(self.accesses)), int(len(self.alters))))], self._COMPONENT_UNITS)
             i = 0
             for a in self.lpu_attributes.alters:
                 #print(a, i)
@@ -126,7 +149,7 @@ class _KaulosModel(Layer):
             for a in self.lpu_attributes.alters:
                 #print(a, i, self.lpu_attributes.alters[a])
                 if len(self.lpu_attributes.alters)>1:
-                    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
+                    self.Ot = T.set_subtensor(self.Ot[:,i:i+self._COMPONENT_UNITS], vars(self)[a])
                 else:
                     self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
                 i += 1
@@ -134,21 +157,25 @@ class _KaulosModel(Layer):
                 i = 0
                 for a in self.lpu_attributes.inters:
                     #print(a, i)
-                    self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
+                    self.St = T.set_subtensor(self.St[:,i:i+self._COMPONENT_UNITS], vars(self)[a])
                     i += 1
         else:
             i = 0
             outs_list = []
+            #for a in self.lpu_attributes.alters:
+                #print(a, i)
+                #self.lpu_attributes.alters[a]
             for a in self.lpu_attributes.alters:
                 #print('Added to output from alters: ', a, i, self.lpu_attributes.alters[a])
                 outs_list.append(vars(self)[a])
+                #outs_list.append(self.lpu_attributes.alters[a])
                 #if len(self.lpu_attributes.alters)>1:
                 #    self.Ot = T.set_subtensor(self.Ot[:,i:i+1], vars(self)[a])
                 #else:
                 #    self.Ot = T.set_subtensor(self.Ot[:,:], vars(self)[a])
                 i += 1
             #zero = tf.constant(1., dtype=tf.int32, name="kaulos_concat_zero")
-            self.Ot = tf.concat(outs_list,1)
+            self.Ot = tf.concat(outs_list,-1)
             state_list = []
             if len(self.inters)>0:
                 i = 0
@@ -157,7 +184,7 @@ class _KaulosModel(Layer):
                     #self.St = T.set_subtensor(self.St[:,i:i+1], vars(self)[a])
                     state_list.append(vars(self)[a])
                     i += 1
-                    self.St = tf.concat(state_list,1)
+                self.St = tf.concat(state_list,-1)
             state_list = []
     def call(self, I, S):
         self.acquire(I, S)
@@ -212,17 +239,17 @@ class KaulosWrapperCell(keras.layers.Layer):
         for i in self.layers:
             i.build(input_shape)
             self.trainable_weights += i.trainable_weights
-        self.kernel = self.add_weight(name='kernel',
-                                      shape=(self.units, self.units),
-                                      initializer='identity',
-                                      trainable=False)
-        if self.W is not None:
-            self.set_weights([self.W])
+        #self.kernel = self.add_weight(name='kernel',
+        #                              shape=(self.units, self.units),
+        #                              initializer='identity',
+        #                              trainable=False)
+        #if self.W is not None:
+        #    self.set_weights([self.W])
         #self.built = True
         super(KaulosWrapperCell, self).build(input_shape)
     def call(self, inputs, states):
         # Update connectivities
-        inputs = K.dot( inputs, self.kernel)
+        #inputs = K.dot( inputs, self.kernel)
         # Initialize circuit
         out_states = []
         outs = []
@@ -256,17 +283,30 @@ class KaulosWrapperCell(keras.layers.Layer):
             else:
                 if len(unit_range)>1:
                     a = tf.constant(np.array([0, unit_range[0]]), dtype=tf.int32, name="kaulos_slice_begin")
+                    #print(unit_range)
                     b = tf.constant(np.array([-1, len(unit_range)]), dtype=tf.int32, name="kaulos_slice_step")
-                    c = tf.constant(np.array([0, state_range[0]]), dtype=tf.int32, name="kaulos_slice_begin_t")
-                    d = tf.constant(np.array([-1, len(state_range)]), dtype=tf.int32, name="kaulos_slice_step_t")
+                    #print(state_range)
+
                     #zero_ph = tf.placeholder("int32")
                     call_states.append(tf.slice(states[0], a, b))
                     if len(self.state_sizes[ii])>1:
+                        c = tf.constant(np.array([0, state_range[0]]), dtype=tf.int32, name="kaulos_slice_begin_t")
+                        d = tf.constant(np.array([-1, len(state_range)]), dtype=tf.int32, name="kaulos_slice_step_t")
                         #a = tf.constant([0,state_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
                         #b = tf.constant(state_range[1:], dtype=tf.int32, name="kaulos_slice_step")
                         call_states.append(tf.slice(states[1], c, d))
                     #a = tf.constant([0,unit_range[0]], dtype=tf.int32, name="kaulos_slice_begin")
                     #b = tf.constant(unit_range[1:], dtype=tf.int32, name="kaulos_slice_step")
+                    a, b = i.call(tf.slice(inputs, a, b),call_states)
+                else:
+                    a = tf.constant(np.array([0, unit_range[0]]), dtype=tf.int32, name="kaulos_slice_begin")
+                    b = tf.constant(np.array([-1, 1]), dtype=tf.int32, name="kaulos_slice_step")
+
+                    call_states.append(tf.slice(states[0], a, b))
+                    if len(self.state_sizes[ii])>1:
+                        c = tf.constant(np.array([0, state_range[0]]), dtype=tf.int32, name="kaulos_slice_begin_t")
+                        d = tf.constant(np.array([-1, 1]), dtype=tf.int32, name="kaulos_slice_step_t")
+                        call_states.append(tf.slice(states[1], c, d))
                     a, b = i.call(tf.slice(inputs, a, b),call_states)
                 out_states.append(b)
                 outs += [a]
