@@ -3,7 +3,18 @@ from .compact_dependencies import *
 _BACKEND = keras.backend.backend()
 
 class _KaulosModel(Layer):
+    """Kaulos Model Layer class. This class implements the step function for a specific component type in the circuit.
+    # Attributes:
+        lpu_attributes (dict): The data structure that holds params, alters (output state variables) and inters (hidden state variables).
+        units (int): Number of variables in the model.
+        state_size (int): Size of the state variable matrix.
+    """
     def __init__(self, component_units = 1, **kwargs):
+        """Initialization function for the _KaulosModel class.
+        # Arguments:
+            component_units (int): Number of units in the Layer.
+            kwargs (dict of OrderedDicts) : Contains the list of trainable parameters, parameters, state variables and initial values.
+        """
         self._COMPONENT_UNITS = component_units
         self.lpu_attributes = LPU_Attr()
         self.lpu_attributes.params = self.params
@@ -13,9 +24,11 @@ class _KaulosModel(Layer):
         self.lpu_attributes.accesses_tensors = OrderedDict()
         if 'dt' not in self.lpu_attributes.params.keys():
             self.lpu_attributes.params['dt'] = 1e-3
+        if 'params_trainable' not in kwargs.keys():
+            kwargs['params_trainable'] = []
         for i in self.accesses:
             self.lpu_attributes.accesses_tensors[i] = None
-        self.update_lpu_attrs(**kwargs)
+
         self.call_outs = []
         self.units = max(int(self._COMPONENT_UNITS * len(self.accesses)), int(self._COMPONENT_UNITS * len(self.alters)))
         if len(self.inters)>0:
@@ -23,10 +36,17 @@ class _KaulosModel(Layer):
         else:
             self.state_size = [self.units]
         super(_KaulosModel, self).__init__()
-        self.add_param_weights(**kwargs)
+        self.update_lpu_attrs(**kwargs)
+        # self.add_param_weights(**kwargs)
     def __getattr__(self, key):
+        """Overrides certain getters for simplification purposes, especially in regards to model specification.
+        # Arguments:
+            key (any): The key to access.
+        """
         if key in self.lpu_attributes.params:
             return self.lpu_attributes.params[key]
+        if key in self.lpu_attributes.params_trainable:
+            return self.lpu_attributes.params_trainable[key]
         if key in self.lpu_attributes.alters:
             return self.lpu_attributes.alters[key]
         if key in self.lpu_attributes.inters:
@@ -34,35 +54,63 @@ class _KaulosModel(Layer):
         if key in self.lpu_attributes.accesses_tensors:
             return self.lpu_attributes.accesses_tensors[key]
         else:
-            return super(_KaulosModel, self).__getattr__(key)
+            return object.__getattribute__(self,key)
     def build(self, input_shape):
+        """Builds the model using the given input_shape; from the Keras model specification.
+        # Arguments:
+            input_shape (tuple of ints): The input shape to the layer.
+        """
         for a in self.lpu_attributes.alters:
             self.call_outs.append(self.lpu_attributes.alters[a])
 
         super(_KaulosModel, self).build(input_shape)
     def compute_output_shape(self, input_shape):
+        """Computes the output shape; from the Keras model specification.
+        # Arguments:
+            input_shape (tuple of ints): The input shape to the layer.
+        """
         return (None, len(self.alters))
     def update_lpu_attrs(self, **kwargs):
+        """Creates the model LPU attributes.
+        # Arguments:
+            kwargs (dictionary): The extra inputs to the class constructor.
+        """
+        if 'params_trainable' in kwargs.keys():
+            for a in kwargs['params_trainable']:
+                if a in self.lpu_attributes.params.keys():
+                    self.lpu_attributes.params_trainable[a] = True
         if self._COMPONENT_UNITS>1:
             for a,b in kwargs.items():
                 if a == 'dt':
                     self.lpu_attributes.params[a] = b
                     self.lpu_attributes.params_trainable[a] = False
                 elif a in self.lpu_attributes.params.keys():
-                    self.lpu_attributes.params[a] = self.add_weight(name=a,
-                                                  shape=(1,self._COMPONENT_UNITS),
-                                                  initializer=b,
-                                                  trainable=self.lpu_attributes.params_trainable[a])
-                    self.lpu_attributes.params_trainable[a] = False
+                    if a in kwargs['params_trainable']:
+                        self.lpu_attributes.params[a] = self.add_weight(name=a,
+                                                      shape=(1,self._COMPONENT_UNITS),
+                                                      initializer=Constant(value=float(self.lpu_attributes.params[a])),
+                                                      trainable=self.lpu_attributes.params_trainable[a])
+                    else:
+                        if a not in self.lpu_attributes.params_trainable.keys():
+                            self.lpu_attributes.params_trainable[a] = False
+                        self.lpu_attributes.params[a] = self.add_weight(name=a,
+                                                      shape=(1,self._COMPONENT_UNITS),
+                                                      initializer=Constant(value=float(b)),
+                                                      trainable=self.lpu_attributes.params_trainable[a])
+                        self.lpu_attributes.params_trainable[a] = False
                 if a in self.lpu_attributes.alters.keys():
+                    if a not in self.lpu_attributes.params_trainable.keys():
+                        self.lpu_attributes.params_trainable[a] = False
                     self.lpu_attributes.alters[a] = self.add_weight(name=a,
                                                   shape=(1,self._COMPONENT_UNITS),
-                                                  initializer=b,
+                                                  initializer=Constant(value=float(b)),
                                                   trainable=self.lpu_attributes.params_trainable[a])
                 if a in self.lpu_attributes.inters.keys():
+                    if a not in self.lpu_attributes.params_trainable.keys():
+                        self.lpu_attributes.params_trainable[a] = False
                     self.lpu_attributes.inters[a] = self.add_weight(name=a,
                                                   shape=(1,self._COMPONENT_UNITS),
-                                                  initializer=b,
+                                                  initializer=Constant(value=float(b)),
                                                   trainable=self.lpu_attributes.params_trainable[a])
         else:
             for a,b in kwargs.items():
@@ -77,19 +125,26 @@ class _KaulosModel(Layer):
                     self.lpu_attributes.params[a] = b
                     self.lpu_attributes.params_trainable[a] = False
     def add_param_weights(self, **kwargs):
+        """Deprecated function for adding trainable parameters.
+        # Arguments:
+            kwargs (dictionary): The extra inputs to the class constructor.
+        """
         if 'params_trainable' in kwargs.keys():
             for a in kwargs['params_trainable']:
                 if a in self.lpu_attributes.params.keys():
                     self.lpu_attributes.params_trainable[a] = True
             for a in kwargs['params_trainable']:
                 if a in self.lpu_attributes.params.keys():
-                    print(self.lpu_attributes.params_trainable[a])
-                    print(self.lpu_attributes.params[a])
                     self.lpu_attributes.params[a] = self.add_weight(name=a,
                                                   shape=(1,self._COMPONENT_UNITS),
                                                   initializer=Constant(value=float(self.lpu_attributes.params[a])),
                                                   trainable=self.lpu_attributes.params_trainable[a])
     def acquire(self, I, S):
+        """Slices and indexes the inputs and states.
+        # Arguments:
+            I (tensor): Input tensor.
+            S (tensor): State tensor.
+        """
         if _BACKEND == "theano":
             i = 0
             for a in self.lpu_attributes.alters:
@@ -144,6 +199,8 @@ class _KaulosModel(Layer):
         if len(self.inters)>0:
             self.St = S[1]
     def distribute(self):
+        """Reformats the step function output back into the Keras format.
+        """
         if _BACKEND == "theano":
             i = 0
             for a in self.lpu_attributes.alters:
@@ -186,7 +243,16 @@ class _KaulosModel(Layer):
                     i += 1
                 self.St = tf.concat(state_list,-1)
             state_list = []
+    def kaulos_step():
+        """Placeholder step update function for the model; gets overridden by the model.
+        """
+        pass
     def call(self, I, S):
+        """Wraps acquire, kaulos_step and call into one; from the Keras model specification format.
+        # Arguments:
+            I (tensor): Input tensor.
+            S (tensor): State tensor.
+        """
         self.acquire(I, S)
         self.kaulos_step()
         self.distribute()
@@ -194,9 +260,11 @@ class _KaulosModel(Layer):
             return self.Ot, [self.Ot, self.St]
         else:
             return self.Ot, [self.Ot]
-    def kaulos_step():
-        pass
+
+
 class LPU_Attr():
+    """Basic class for LPU ("local processing unit", an abstraction for dynamical systems) attributes.
+    """
     def __init__(self, **kwargs):
         self.accesses = []
         self.params = OrderedDict()
@@ -207,6 +275,12 @@ class LPU_Attr():
 
 
 class KaulosWrapperCell(keras.layers.Layer):
+    """Kaulos Cell Layer class. This class turns circuit into a cell for Keras RNNs.
+    # Attributes:
+        lpu_attributes (dict): The data structure that holds params, alters (output state variables) and inters (hidden state variables).
+        units (int): Number of variables in the model.
+        state_size (int): Size of the state variable matrix.
+    """
     def __init__(self, layers, W = None, **kwargs):
         self.units = 0
         self.unit_sizes = []
@@ -236,6 +310,10 @@ class KaulosWrapperCell(keras.layers.Layer):
         self.W = W
         super(KaulosWrapperCell, self).__init__(**kwargs)
     def build(self, input_shape):
+        """Builds the model using the given input_shape; from the Keras model specification.
+        # Arguments:
+            input_shape (tuple of ints): The input shape to the layer.
+        """
         for i in self.layers:
             i.build(input_shape)
             self.trainable_weights += i.trainable_weights
@@ -248,6 +326,11 @@ class KaulosWrapperCell(keras.layers.Layer):
         #self.built = True
         super(KaulosWrapperCell, self).build(input_shape)
     def call(self, inputs, states):
+        """Call function that handles the wiring between all the different component layers; from the Keras model specification format.
+        # Arguments:
+            inputs (tensor): Input tensor.
+            states (list of tensors): List of state tensors.
+        """
         # Update connectivities
         #inputs = K.dot( inputs, self.kernel)
         # Initialize circuit
